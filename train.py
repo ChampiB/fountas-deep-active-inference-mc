@@ -21,6 +21,7 @@ parser.add_argument('-b', '--batch', type=int, default=50, help='Select batch si
 parser.add_argument('-o', '--omega', type=bool, default=False, help='Should the omega parameter be computed as in the paper?.')
 parser.add_argument('-e', '--efe', type=bool, default=False, help='Should the expected free energy be computed as in the paper?.')
 parser.add_argument('-v', '--vfe', type=bool, default=False, help='Should the variational free energy be computed as in the paper?.')
+parser.add_argument('-s', '--signature', type=str, default='final_model_', help='The directory where the model should be saved?.')
 args = parser.parse_args()
 
 '''
@@ -36,11 +37,7 @@ deepness = 1;        samples = 1;           repeats = 5
 l_rate_top = 1e-04;  l_rate_mid = 1e-04;    l_rate_down = 0.001
 ROUNDS = 1000;       TEST_SIZE = 1000;      epochs = 1000
 
-efe_as_in_paper = args.efe
-omega_as_in_paper = args.omega
-vfe_as_in_paper = args.vfe
-
-signature = 'final_model_'
+signature = args.signature
 signature += str(gamma_rate)+'_'+str(gamma_delay)+'_'+str(var_a)+'_'+str(args.batch)+'_'+str(s_dim)+'_'+str(repeats)
 folder = 'figs_'+signature
 folder_chp = folder + '/checkpoints'
@@ -89,21 +86,21 @@ for epoch in range(start_epoch, epochs + 1):
     for i in range(ROUNDS):
         # -- MAKE TRAINING DATA FOR THIS BATCH ---------------------------------
         games.randomize_environment_all()
-        o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats, as_in_paper=efe_as_in_paper)
+        o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats, as_in_paper=args.efe)
 
         # -- TRAIN TOP LAYER ---------------------------------------------------
         qs0,_,_ = model.model_down.encoder_with_sample(o0)
         D_KL_pi = loss.train_model_top(model_top=model.model_top, s=qs0, log_Ppi=log_Ppi, optimizer=optimizers['top'])
         D_KL_pi = D_KL_pi.numpy()
 
-        current_omega = loss.compute_omega(D_KL_pi, a=var_a, b=var_b, c=var_c, d=var_d, as_in_paper=omega_as_in_paper).reshape(-1,1)
+        current_omega = loss.compute_omega(D_KL_pi, a=var_a, b=var_b, c=var_c, d=var_d, as_in_paper=args.omega).reshape(-1,1)
 
         # -- TRAIN MIDDLE LAYER ------------------------------------------------
         qs1_mean, qs1_logvar = model.model_down.encoder(o1)
         ps1_mean, ps1_logvar = loss.train_model_mid(model_mid=model.model_mid, s0=qs0, qs1_mean=qs1_mean, qs1_logvar=qs1_logvar, Ppi_sampled=pi0, omega=current_omega, optimizer=optimizers['mid'])
 
         # -- TRAIN DOWN LAYER --------------------------------------------------
-        loss.train_model_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=current_omega, optimizer=optimizers['down'], as_in_paper=vfe_as_in_paper)
+        loss.train_model_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=current_omega, optimizer=optimizers['down'], as_in_paper=args.vfe)
 
     if epoch % 2 == 0:
         model.save_all(folder_chp, stats, argv[0], optimizers=optimizers)
@@ -119,7 +116,7 @@ for epoch in range(start_epoch, epochs + 1):
     qs1_mean, qs1_logvar = model.model_down.encoder(o1)
     qs1 = model.model_down.reparameterize(qs1_mean, qs1_logvar)
     F_mid, loss_terms_mid, ps1, ps1_mean, ps1_logvar = loss.compute_loss_mid(model_mid=model.model_mid, s0=s0, Ppi_sampled=pi0, qs1_mean=qs1_mean, qs1_logvar=qs1_logvar, omega=var_a/2.0+var_d)
-    F_down, loss_terms, po1, qs1 = loss.compute_loss_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=var_a/2.0+var_d, as_in_paper=vfe_as_in_paper)
+    F_down, loss_terms, po1, qs1 = loss.compute_loss_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=var_a/2.0+var_d, as_in_paper=args.vfe)
     stats['F'].append(np.mean(F_down) + np.mean(F_mid) + np.mean(F_top))
     stats['F_top'].append(np.mean(F_top))
     stats['F_mid'].append(np.mean(F_mid))

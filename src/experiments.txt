@@ -1,0 +1,5 @@
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega=False --efe=False --vfe=False --signature="experiments_FalseFalseFalse"
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega=False --efe=True --vfe=False --signature="experiments_FalseTrueFalse"
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega=False --efe=False --vfe=True --signature="experiments_FalseFalseTrue"
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega=True --efe=False --vfe=False --signature="experiments_TrueFalseFalse"
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega=True --efe=True --vfe=True --signature="experiments_TrueTrueTrue"
