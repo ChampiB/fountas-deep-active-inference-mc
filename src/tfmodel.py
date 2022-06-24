@@ -183,8 +183,6 @@ class ActiveInferenceModel:
         self.save_weights(folder_chp)
         with open(folder_chp+'/stats.pkl','wb') as ff:
             pickle.dump(stats,ff)
-        with open(folder_chp+'/optimizers.pkl','wb') as ff:
-            pickle.dump(optimizers,ff)
         copyfile('src/tfmodel.py', folder_chp+'/tfmodel.py')
         copyfile('src/tfloss.py', folder_chp+'/tfloss.py')
         if script_file != "":
@@ -194,11 +192,7 @@ class ActiveInferenceModel:
         self.load_weights(folder_chp)
         with open(folder_chp+'/stats.pkl','rb') as ff:
             stats = pickle.load(ff)
-        try:
-            with open(folder_chp+'/optimizers.pkl','rb') as ff:
-                optimizers = pickle.load(ff)
-        except:
-            optimizers = {}
+        optimizers = {}
         if len(stats['var_beta_s'])>0: self.model_down.beta_s.assign(stats['var_beta_s'][-1])
         if len(stats['var_gamma'])>0: self.model_down.gamma.assign(stats['var_gamma'][-1])
         if len(stats['var_beta_o'])>0: self.model_down.beta_o.assign(stats['var_beta_o'][-1])
