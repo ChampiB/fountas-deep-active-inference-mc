@@ -3,8 +3,11 @@ import numpy as np
 
 from src.tfutils import *
 
-def compute_omega(kl_pi, a, b, c, d):
-    return a * ( 1.0 - 1.0/(1.0 + np.exp(- (kl_pi-b) / c)) ) + d
+def compute_omega(kl_pi, a, b, c, d, as_in_paper=True):
+    if as_in_paper:  # Compute omega as describe in Fountas paper
+        return a / (1.0 + np.exp((kl_pi - b) / c)) + d
+    else:  # Compute omega as describe in Fountas repository
+        return a * (1.0 - 1.0 / (1.0 + np.exp(- (kl_pi - b) / c))) + d
 
 @tf.function
 def compute_kl_div_pi(model, o0, log_Ppi):
@@ -41,7 +44,7 @@ def compute_loss_mid(model_mid, s0, Ppi_sampled, qs1_mean, qs1_logvar, omega):
     return F_mid, loss_terms, ps1, ps1_mean, ps1_logvar
 
 @tf.function
-def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement = 0.00001):
+def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement = 0.00001, as_in_paper=True):
     qs1_mean, qs1_logvar = model_down.encoder(o1)
     qs1 = model_down.reparameterize(qs1_mean, qs1_logvar)
     po1 = model_down.decoder(qs1)
@@ -53,7 +56,10 @@ def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement 
 
     # TERM: Eqpi D_kl[Q(s1)||N(0.0,1.0)]
     # --------------------------------------------------------------------------
-    kl_div_s_naive_anal = kl_div_loss_analytically_from_logvar_and_precision(qs1_mean, qs1_logvar, 0.0, 0.0, omega)
+    if as_in_paper:
+        kl_div_s_naive_anal = kl_div_loss_analytically_from_logvar_and_precision(qs1_mean, qs1_logvar, 0.0, 0.0, 1.0)
+    else:
+        kl_div_s_naive_anal = kl_div_loss_analytically_from_logvar_and_precision(qs1_mean, qs1_logvar, 0.0, 0.0, omega)
     kl_div_s_naive = tf.reduce_sum(kl_div_s_naive_anal, 1)
 
     # TERM: Eqpi D_kl[Q(s1)||P(s1|s0,pi)]
@@ -94,11 +100,11 @@ def train_model_mid(model_mid, s0, qs1_mean, qs1_logvar, Ppi_sampled, omega, opt
     return ps1_mean, ps1_logvar
 
 @tf.function
-def train_model_down(model_down, o1, ps1_mean, ps1_logvar, omega, optimizer):
+def train_model_down(model_down, o1, ps1_mean, ps1_logvar, omega, optimizer, as_in_paper=True):
     ps1_mean_stopped = tf.stop_gradient(ps1_mean)
     ps1_logvar_stopped = tf.stop_gradient(ps1_logvar)
     omega_stopped = tf.stop_gradient(omega)
     with tf.GradientTape() as tape:
-        F, _, _, _ = compute_loss_down(model_down=model_down, o1=o1, ps1_mean=ps1_mean_stopped, ps1_logvar=ps1_logvar_stopped, omega=omega_stopped)
+        F, _, _, _ = compute_loss_down(model_down=model_down, o1=o1, ps1_mean=ps1_mean_stopped, ps1_logvar=ps1_logvar_stopped, omega=omega_stopped, as_in_paper=as_in_paper)
         gradients = tape.gradient(F, model_down.trainable_variables)
         optimizer.apply_gradients(zip(gradients, model_down.trainable_variables))

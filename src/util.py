@@ -52,14 +52,14 @@ def softmax_multi_with_log(x, single_values=4, eps=1e-20, temperature=10.0):
     logSM = x - np.log(e_x.sum(axis=1).reshape(-1,1) + eps) # to avoid infs
     return SM, logSM
 
-def make_batch_dsprites_active_inference(games, model, deepness=10, samples=5, calc_mean=False, repeats=1):
+def make_batch_dsprites_active_inference(games, model, deepness=10, samples=5, calc_mean=False, repeats=1, as_in_paper=True):
     o0 = games.current_frame_all()
     o0_repeated = o0.repeat(4,0) # The 0th dimension
 
     pi_one_hot = np.array([[1.0,0.0,0.0,0.0], [0.0,1.0,0.0,0.0], [0.0,0.0,1.0,0.0], [0.0,0.0,0.0,1.0]], dtype=np_precision)
     pi_repeated = np.tile(pi_one_hot,(games.games_no, 1))
 
-    sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean)
+    sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean, as_in_paper=as_in_paper)
     terms1 = -sum_terms[0]
     terms12 = -sum_terms[0]+sum_terms[1]
     # Shape now is (games_no,4)

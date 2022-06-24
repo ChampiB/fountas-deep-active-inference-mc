@@ -224,7 +224,7 @@ class ActiveInferenceModel:
         return Qpi
 
     @tf.function
-    def calculate_G_repeated(self, o, pi, steps=1, calc_mean=False, samples=10):
+    def calculate_G_repeated(self, o, pi, steps=1, calc_mean=False, samples=10, as_in_paper=True):
         """
         We simultaneously calculate G for the four policies of repeating each
         one of the four actions continuously..
@@ -241,7 +241,7 @@ class ActiveInferenceModel:
         else: s0_temp = qs0
 
         for t in range(steps):
-            G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, pi, samples=samples)
+            G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, pi, samples=samples, as_in_paper=as_in_paper)
 
             sum_terms[0] += terms[0]
             sum_terms[1] += terms[1]
@@ -256,7 +256,7 @@ class ActiveInferenceModel:
         return sum_G, sum_terms, po1
 
     @tf.function
-    def calculate_G_4_repeated(self, o, steps=1, calc_mean=False, samples=10):
+    def calculate_G_4_repeated(self, o, steps=1, calc_mean=False, samples=10, as_in_paper=True):
         """
         We simultaneously calculate G for the four policies of repeating each
         one of the four actions continuously..
@@ -274,9 +274,9 @@ class ActiveInferenceModel:
 
         for t in range(steps):
             if calc_mean:
-                G, terms, ps1_mean, po1 = self.calculate_G_mean(s0_temp, self.pi_one_hot)
+                G, terms, ps1_mean, po1 = self.calculate_G_mean(s0_temp, self.pi_one_hot, as_in_paper=as_in_paper)
             else:
-                G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, self.pi_one_hot, samples=samples)
+                G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, self.pi_one_hot, samples=samples, as_in_paper=as_in_paper)
 
             sum_terms[0] += terms[0]
             sum_terms[1] += terms[1]
@@ -291,7 +291,7 @@ class ActiveInferenceModel:
         return sum_G, sum_terms, po1
 
     @tf.function
-    def calculate_G(self, s0, pi0, samples=10):
+    def calculate_G(self, s0, pi0, samples=10, as_in_paper=True):
 
         term0 = tf.zeros([s0.shape[0]], self.tf_precision)
         term1 = tf.zeros([s0.shape[0]], self.tf_precision)
@@ -305,7 +305,11 @@ class ActiveInferenceModel:
             term0 += logpo1
 
             # E [ log Q(s|pi) - log Q(s|o,pi) ]
-            term1 += - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
+            if as_in_paper:
+                term1 += tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar)) - \
+                         tf.reduce_sum(entropy_normal_from_logvar(qs1_logvar), axis=1)
+            else:
+                term1 += - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
         term0 /= float(samples)
         term1 /= float(samples)
 
@@ -330,7 +334,7 @@ class ActiveInferenceModel:
         return G, [term0, term1, term2], ps1, ps1_mean, po1
 
     @tf.function
-    def calculate_G_mean(self, s0, pi0):
+    def calculate_G_mean(self, s0, pi0, as_in_paper=True):
 
         _, ps1_mean, ps1_logvar = self.model_mid.transition_with_sample(pi0, s0)
         po1 = self.model_down.decoder(ps1_mean)
@@ -341,7 +345,11 @@ class ActiveInferenceModel:
         term0 = logpo1
 
         # E [ log Q(s|pi) - log Q(s|o,pi) ]
-        term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
+        if as_in_paper:
+            term1 = tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar)) - \
+                     tf.reduce_sum(entropy_normal_from_logvar(qs1_logvar), axis=1)
+        else:
+            term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
 
         # Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
         po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0, s0)[1])
@@ -359,7 +367,7 @@ class ActiveInferenceModel:
         return G, [term0, term1, term2], ps1_mean, po1
 
     @tf.function
-    def calculate_G_given_trajectory(self, s0_traj, ps1_traj, ps1_mean_traj, ps1_logvar_traj, pi0_traj):
+    def calculate_G_given_trajectory(self, s0_traj, ps1_traj, ps1_mean_traj, ps1_logvar_traj, pi0_traj, as_in_paper=True):
         # NOTE: len(s0_traj) = len(s1_traj) = len(pi0_traj)
 
         po1 = self.model_down.decoder(ps1_traj)
@@ -369,7 +377,11 @@ class ActiveInferenceModel:
         term0 = self.check_reward(po1)
 
         # E [ log Q(s|pi) - log Q(s|o,pi) ]
-        term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar_traj) + entropy_normal_from_logvar(qs1_logvar), axis=1)
+        if as_in_paper:
+            term1 = tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar_traj)) - \
+                     tf.reduce_sum(entropy_normal_from_logvar(qs1_logvar), axis=1)
+        else:
+            term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar_traj) + entropy_normal_from_logvar(qs1_logvar), axis=1)
 
         #  Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
         po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0_traj, s0_traj)[0])
@@ -385,7 +397,7 @@ class ActiveInferenceModel:
         return - term0 + term1 + term2
 
     #@tf.function
-    def mcts_step_simulate(self, starting_s, depth, use_means=False):
+    def mcts_step_simulate(self, starting_s, depth, use_means=False, as_in_paper=True):
         s0 = np.zeros((depth, self.s_dim), self.precision)
         ps1 = np.zeros((depth, self.s_dim), self.precision)
         ps1_mean = np.zeros((depth, self.s_dim), self.precision)
@@ -423,5 +435,5 @@ class ActiveInferenceModel:
                 else:
                     s0[t+1] = ps1_new[0].numpy()
 
-        G = tf.reduce_mean(self.calculate_G_given_trajectory(s0, ps1, ps1_mean, ps1_logvar, pi0)).numpy()
+        G = tf.reduce_mean(self.calculate_G_given_trajectory(s0, ps1, ps1_mean, ps1_logvar, pi0, as_in_paper=as_in_paper)).numpy()
         return G, pi0, Qpi_t_to_return

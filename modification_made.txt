@@ -1,0 +1,268 @@
+diff --git a/.gitignore b/.gitignore
+index 0c53590..29f0380 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,5 @@
++.idea/
++
+ # Byte-compiled / optimized / DLL files
+ __pycache__/
+ *.py[cod]
+diff --git a/src/tfloss.py b/src/tfloss.py
+index 71660f6..368591b 100644
+--- a/src/tfloss.py
++++ b/src/tfloss.py
+@@ -3,8 +3,11 @@ import numpy as np
+ 
+ from src.tfutils import *
+ 
+-def compute_omega(kl_pi, a, b, c, d):
+-    return a * ( 1.0 - 1.0/(1.0 + np.exp(- (kl_pi-b) / c)) ) + d
++def compute_omega(kl_pi, a, b, c, d, as_in_paper=True):
++    if as_in_paper:  # Compute omega as describe in Fountas paper
++        return a / (1.0 + np.exp((kl_pi - b) / c)) + d
++    else:  # Compute omega as describe in Fountas repository
++        return a * (1.0 - 1.0 / (1.0 + np.exp(- (kl_pi - b) / c))) + d
+ 
+ @tf.function
+ def compute_kl_div_pi(model, o0, log_Ppi):
+@@ -41,7 +44,7 @@ def compute_loss_mid(model_mid, s0, Ppi_sampled, qs1_mean, qs1_logvar, omega):
+     return F_mid, loss_terms, ps1, ps1_mean, ps1_logvar
+ 
+ @tf.function
+-def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement = 0.00001):
++def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement = 0.00001, as_in_paper=True):
+     qs1_mean, qs1_logvar = model_down.encoder(o1)
+     qs1 = model_down.reparameterize(qs1_mean, qs1_logvar)
+     po1 = model_down.decoder(qs1)
+@@ -53,7 +56,10 @@ def compute_loss_down(model_down, o1, ps1_mean, ps1_logvar, omega, displacement
+ 
+     # TERM: Eqpi D_kl[Q(s1)||N(0.0,1.0)]
+     # --------------------------------------------------------------------------
+-    kl_div_s_naive_anal = kl_div_loss_analytically_from_logvar_and_precision(qs1_mean, qs1_logvar, 0.0, 0.0, omega)
++    if as_in_paper:
++        kl_div_s_naive_anal = kl_div_loss_analytically_from_logvar_and_precision(qs1_mean, qs1_logvar, 0.0, 0.0, 1.0)
++    else:
++        kl_div_s_naive_anal = kl_div_loss_analytically_from_logvar_and_precision(qs1_mean, qs1_logvar, 0.0, 0.0, omega)
+     kl_div_s_naive = tf.reduce_sum(kl_div_s_naive_anal, 1)
+ 
+     # TERM: Eqpi D_kl[Q(s1)||P(s1|s0,pi)]
+@@ -94,11 +100,11 @@ def train_model_mid(model_mid, s0, qs1_mean, qs1_logvar, Ppi_sampled, omega, opt
+     return ps1_mean, ps1_logvar
+ 
+ @tf.function
+-def train_model_down(model_down, o1, ps1_mean, ps1_logvar, omega, optimizer):
++def train_model_down(model_down, o1, ps1_mean, ps1_logvar, omega, optimizer, as_in_paper=True):
+     ps1_mean_stopped = tf.stop_gradient(ps1_mean)
+     ps1_logvar_stopped = tf.stop_gradient(ps1_logvar)
+     omega_stopped = tf.stop_gradient(omega)
+     with tf.GradientTape() as tape:
+-        F, _, _, _ = compute_loss_down(model_down=model_down, o1=o1, ps1_mean=ps1_mean_stopped, ps1_logvar=ps1_logvar_stopped, omega=omega_stopped)
++        F, _, _, _ = compute_loss_down(model_down=model_down, o1=o1, ps1_mean=ps1_mean_stopped, ps1_logvar=ps1_logvar_stopped, omega=omega_stopped, as_in_paper=as_in_paper)
+         gradients = tape.gradient(F, model_down.trainable_variables)
+         optimizer.apply_gradients(zip(gradients, model_down.trainable_variables))
+diff --git a/src/tfmodel.py b/src/tfmodel.py
+index 0b4505a..407f79d 100644
+--- a/src/tfmodel.py
++++ b/src/tfmodel.py
+@@ -224,7 +224,7 @@ class ActiveInferenceModel:
+         return Qpi
+ 
+     @tf.function
+-    def calculate_G_repeated(self, o, pi, steps=1, calc_mean=False, samples=10):
++    def calculate_G_repeated(self, o, pi, steps=1, calc_mean=False, samples=10, as_in_paper=True):
+         """
+         We simultaneously calculate G for the four policies of repeating each
+         one of the four actions continuously..
+@@ -241,7 +241,7 @@ class ActiveInferenceModel:
+         else: s0_temp = qs0
+ 
+         for t in range(steps):
+-            G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, pi, samples=samples)
++            G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, pi, samples=samples, as_in_paper=as_in_paper)
+ 
+             sum_terms[0] += terms[0]
+             sum_terms[1] += terms[1]
+@@ -256,7 +256,7 @@ class ActiveInferenceModel:
+         return sum_G, sum_terms, po1
+ 
+     @tf.function
+-    def calculate_G_4_repeated(self, o, steps=1, calc_mean=False, samples=10):
++    def calculate_G_4_repeated(self, o, steps=1, calc_mean=False, samples=10, as_in_paper=True):
+         """
+         We simultaneously calculate G for the four policies of repeating each
+         one of the four actions continuously..
+@@ -274,9 +274,9 @@ class ActiveInferenceModel:
+ 
+         for t in range(steps):
+             if calc_mean:
+-                G, terms, ps1_mean, po1 = self.calculate_G_mean(s0_temp, self.pi_one_hot)
++                G, terms, ps1_mean, po1 = self.calculate_G_mean(s0_temp, self.pi_one_hot, as_in_paper=as_in_paper)
+             else:
+-                G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, self.pi_one_hot, samples=samples)
++                G, terms, s1, ps1_mean, po1 = self.calculate_G(s0_temp, self.pi_one_hot, samples=samples, as_in_paper=as_in_paper)
+ 
+             sum_terms[0] += terms[0]
+             sum_terms[1] += terms[1]
+@@ -291,7 +291,7 @@ class ActiveInferenceModel:
+         return sum_G, sum_terms, po1
+ 
+     @tf.function
+-    def calculate_G(self, s0, pi0, samples=10):
++    def calculate_G(self, s0, pi0, samples=10, as_in_paper=True):
+ 
+         term0 = tf.zeros([s0.shape[0]], self.tf_precision)
+         term1 = tf.zeros([s0.shape[0]], self.tf_precision)
+@@ -305,7 +305,11 @@ class ActiveInferenceModel:
+             term0 += logpo1
+ 
+             # E [ log Q(s|pi) - log Q(s|o,pi) ]
+-            term1 += - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
++            if as_in_paper:
++                term1 += tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar)) - \
++                         tf.reduce_sum(entropy_normal_from_logvar(qs1_logvar), axis=1)
++            else:
++                term1 += - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
+         term0 /= float(samples)
+         term1 /= float(samples)
+ 
+@@ -330,7 +334,7 @@ class ActiveInferenceModel:
+         return G, [term0, term1, term2], ps1, ps1_mean, po1
+ 
+     @tf.function
+-    def calculate_G_mean(self, s0, pi0):
++    def calculate_G_mean(self, s0, pi0, as_in_paper=True):
+ 
+         _, ps1_mean, ps1_logvar = self.model_mid.transition_with_sample(pi0, s0)
+         po1 = self.model_down.decoder(ps1_mean)
+@@ -341,7 +345,11 @@ class ActiveInferenceModel:
+         term0 = logpo1
+ 
+         # E [ log Q(s|pi) - log Q(s|o,pi) ]
+-        term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
++        if as_in_paper:
++            term1 = tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar)) - \
++                     tf.reduce_sum(entropy_normal_from_logvar(qs1_logvar), axis=1)
++        else:
++            term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar) + entropy_normal_from_logvar(qs1_logvar), axis=1)
+ 
+         # Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
+         po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0, s0)[1])
+@@ -359,7 +367,7 @@ class ActiveInferenceModel:
+         return G, [term0, term1, term2], ps1_mean, po1
+ 
+     @tf.function
+-    def calculate_G_given_trajectory(self, s0_traj, ps1_traj, ps1_mean_traj, ps1_logvar_traj, pi0_traj):
++    def calculate_G_given_trajectory(self, s0_traj, ps1_traj, ps1_mean_traj, ps1_logvar_traj, pi0_traj, as_in_paper=True):
+         # NOTE: len(s0_traj) = len(s1_traj) = len(pi0_traj)
+ 
+         po1 = self.model_down.decoder(ps1_traj)
+@@ -369,7 +377,11 @@ class ActiveInferenceModel:
+         term0 = self.check_reward(po1)
+ 
+         # E [ log Q(s|pi) - log Q(s|o,pi) ]
+-        term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar_traj) + entropy_normal_from_logvar(qs1_logvar), axis=1)
++        if as_in_paper:
++            term1 = tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar_traj)) - \
++                     tf.reduce_sum(entropy_normal_from_logvar(qs1_logvar), axis=1)
++        else:
++            term1 = - tf.reduce_sum(entropy_normal_from_logvar(ps1_logvar_traj) + entropy_normal_from_logvar(qs1_logvar), axis=1)
+ 
+         #  Term 2.1: Sampling different thetas, i.e. sampling different ps_mean/logvar with dropout!
+         po1_temp1 = self.model_down.decoder(self.model_mid.transition_with_sample(pi0_traj, s0_traj)[0])
+@@ -385,7 +397,7 @@ class ActiveInferenceModel:
+         return - term0 + term1 + term2
+ 
+     #@tf.function
+-    def mcts_step_simulate(self, starting_s, depth, use_means=False):
++    def mcts_step_simulate(self, starting_s, depth, use_means=False, as_in_paper=True):
+         s0 = np.zeros((depth, self.s_dim), self.precision)
+         ps1 = np.zeros((depth, self.s_dim), self.precision)
+         ps1_mean = np.zeros((depth, self.s_dim), self.precision)
+@@ -423,5 +435,5 @@ class ActiveInferenceModel:
+                 else:
+                     s0[t+1] = ps1_new[0].numpy()
+ 
+-        G = tf.reduce_mean(self.calculate_G_given_trajectory(s0, ps1, ps1_mean, ps1_logvar, pi0)).numpy()
++        G = tf.reduce_mean(self.calculate_G_given_trajectory(s0, ps1, ps1_mean, ps1_logvar, pi0, as_in_paper=as_in_paper)).numpy()
+         return G, pi0, Qpi_t_to_return
+diff --git a/src/util.py b/src/util.py
+index fa8a60f..bc0da6d 100644
+--- a/src/util.py
++++ b/src/util.py
+@@ -52,14 +52,14 @@ def softmax_multi_with_log(x, single_values=4, eps=1e-20, temperature=10.0):
+     logSM = x - np.log(e_x.sum(axis=1).reshape(-1,1) + eps) # to avoid infs
+     return SM, logSM
+ 
+-def make_batch_dsprites_active_inference(games, model, deepness=10, samples=5, calc_mean=False, repeats=1):
++def make_batch_dsprites_active_inference(games, model, deepness=10, samples=5, calc_mean=False, repeats=1, as_in_paper=True):
+     o0 = games.current_frame_all()
+     o0_repeated = o0.repeat(4,0) # The 0th dimension
+ 
+     pi_one_hot = np.array([[1.0,0.0,0.0,0.0], [0.0,1.0,0.0,0.0], [0.0,0.0,1.0,0.0], [0.0,0.0,0.0,1.0]], dtype=np_precision)
+     pi_repeated = np.tile(pi_one_hot,(games.games_no, 1))
+ 
+-    sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean)
++    sum_G, sum_terms, po2 = model.calculate_G_repeated(o0_repeated, pi_repeated, steps=deepness, samples=samples, calc_mean=calc_mean, as_in_paper=as_in_paper)
+     terms1 = -sum_terms[0]
+     terms12 = -sum_terms[0]+sum_terms[1]
+     # Shape now is (games_no,4)
+diff --git a/train.py b/train.py
+index 9697cab..d872982 100644
+--- a/train.py
++++ b/train.py
+@@ -18,6 +18,9 @@ from graphs.stats_plot import stats_plot
+ parser = argparse.ArgumentParser(description='Training script.')
+ parser.add_argument('-r', '--resume', action='store_true', help='If this is used, the script tries to load existing weights and resume training.')
+ parser.add_argument('-b', '--batch', type=int, default=50, help='Select batch size.')
++parser.add_argument('-o', '--omega', type=bool, default=False, help='Should the omega parameter be computed as in the paper?.')
++parser.add_argument('-e', '--efe', type=bool, default=False, help='Should the expected free energy be computed as in the paper?.')
++parser.add_argument('-v', '--vfe', type=bool, default=False, help='Should the variational free energy be computed as in the paper?.')
+ args = parser.parse_args()
+ 
+ '''
+@@ -33,6 +36,10 @@ deepness = 1;        samples = 1;           repeats = 5
+ l_rate_top = 1e-04;  l_rate_mid = 1e-04;    l_rate_down = 0.001
+ ROUNDS = 1000;       TEST_SIZE = 1000;      epochs = 1000
+ 
++efe_as_in_paper = args.efe
++omega_as_in_paper = args.omega
++vfe_as_in_paper = args.vfe
++
+ signature = 'final_model_'
+ signature += str(gamma_rate)+'_'+str(gamma_delay)+'_'+str(var_a)+'_'+str(args.batch)+'_'+str(s_dim)+'_'+str(repeats)
+ folder = 'figs_'+signature
+@@ -82,21 +89,21 @@ for epoch in range(start_epoch, epochs + 1):
+     for i in range(ROUNDS):
+         # -- MAKE TRAINING DATA FOR THIS BATCH ---------------------------------
+         games.randomize_environment_all()
+-        o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats)
++        o0, o1, pi0, log_Ppi = u.make_batch_dsprites_active_inference(games=games, model=model, deepness=deepness, samples=samples, calc_mean=True, repeats=repeats, as_in_paper=efe_as_in_paper)
+ 
+         # -- TRAIN TOP LAYER ---------------------------------------------------
+         qs0,_,_ = model.model_down.encoder_with_sample(o0)
+         D_KL_pi = loss.train_model_top(model_top=model.model_top, s=qs0, log_Ppi=log_Ppi, optimizer=optimizers['top'])
+         D_KL_pi = D_KL_pi.numpy()
+ 
+-        current_omega = loss.compute_omega(D_KL_pi, a=var_a, b=var_b, c=var_c, d=var_d).reshape(-1,1)
++        current_omega = loss.compute_omega(D_KL_pi, a=var_a, b=var_b, c=var_c, d=var_d, as_in_paper=omega_as_in_paper).reshape(-1,1)
+ 
+         # -- TRAIN MIDDLE LAYER ------------------------------------------------
+         qs1_mean, qs1_logvar = model.model_down.encoder(o1)
+         ps1_mean, ps1_logvar = loss.train_model_mid(model_mid=model.model_mid, s0=qs0, qs1_mean=qs1_mean, qs1_logvar=qs1_logvar, Ppi_sampled=pi0, omega=current_omega, optimizer=optimizers['mid'])
+ 
+         # -- TRAIN DOWN LAYER --------------------------------------------------
+-        loss.train_model_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=current_omega, optimizer=optimizers['down'])
++        loss.train_model_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=current_omega, optimizer=optimizers['down'], as_in_paper=vfe_as_in_paper)
+ 
+     if epoch % 2 == 0:
+         model.save_all(folder_chp, stats, argv[0], optimizers=optimizers)
+@@ -112,7 +119,7 @@ for epoch in range(start_epoch, epochs + 1):
+     qs1_mean, qs1_logvar = model.model_down.encoder(o1)
+     qs1 = model.model_down.reparameterize(qs1_mean, qs1_logvar)
+     F_mid, loss_terms_mid, ps1, ps1_mean, ps1_logvar = loss.compute_loss_mid(model_mid=model.model_mid, s0=s0, Ppi_sampled=pi0, qs1_mean=qs1_mean, qs1_logvar=qs1_logvar, omega=var_a/2.0+var_d)
+-    F_down, loss_terms, po1, qs1 = loss.compute_loss_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=var_a/2.0+var_d)
++    F_down, loss_terms, po1, qs1 = loss.compute_loss_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=var_a/2.0+var_d, as_in_paper=vfe_as_in_paper)
+     stats['F'].append(np.mean(F_down) + np.mean(F_mid) + np.mean(F_top))
+     stats['F_top'].append(np.mean(F_top))
+     stats['F_mid'].append(np.mean(F_mid))
