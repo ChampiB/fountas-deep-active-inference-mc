@@ -1,6 +1,5 @@
 import numpy as np
-import pickle
-
+import cv2
 np_precision = np.float32
 
 def make_batch_dsprites_random(game, index, size, repeats):
@@ -83,3 +82,20 @@ def compare_reward(o1, po1):
     ''' Using MSE. '''
     logpo1 = np.square(o1[:,0:3,0:64,:] - po1[:,0:3,0:64,:]).mean(axis=(0,1,2,3))
     return logpo1
+
+
+def display_gui(game):
+    # Display the current frame using Open CV.
+    frame = game.current_frame(0)
+    frame[59:63, 31] = 1.0
+    frame = cv2.resize(frame, (500, 500), interpolation=cv2.INTER_NEAREST)
+    frame = cv2.putText(frame, 'score: '+str(game.get_reward(0)), (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+    frame = cv2.putText(frame, 's: '+str(game.current_s[0]), (15,50), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255), 1, cv2.LINE_AA)
+    cv2.imshow('demo', frame)
+
+    # Handle user query (KEYBOARD SHORTCUTS)
+    k = cv2.waitKey(30)
+    if k == ord('q') or k == 27:
+        return True
+    return False
+

@@ -143,7 +143,7 @@ while t < args.duration:
             G_choices = [0.0,0.0,0.0,0.0]
             R_choices = [0.0,0.0,0.0,0.0]
         elif args.method == 'mcts':
-            mcts_path, repeats_done, states_explored, all_paths, all_paths_G = mcts.active_inference_mcts(model=model, frame=o_single, params=params, o_shape=(64,64,1))
+            mcts_path, repeats_done, states_explored, all_paths, all_paths_G = mcts.active_inference_mcts(model=model, frame=o_single, params=params, shape=(64, 64, 1))
             path_pos_x = int(game.current_s[0,5])
             path_pos_y = int(game.current_s[0,4])
             mask = make_mask(all_paths, path_pos_x, path_pos_y)

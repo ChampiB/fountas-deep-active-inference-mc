@@ -103,7 +103,7 @@ for epoch in range(start_epoch, epochs + 1):
         loss.train_model_down(model_down=model.model_down, o1=o1, ps1_mean=ps1_mean, ps1_logvar=ps1_logvar, omega=current_omega, optimizer=optimizers['down'], as_in_paper=args.vfe)
 
     if epoch % 2 == 0:
-        model.save_all(folder_chp, stats, argv[0], optimizers=optimizers)
+        model.save_all(folder_chp, stats, argv[0])
     if epoch % 2 == 25:
         # keep the checkpoints every 25 steps
         copy_tree(folder_chp, folder_chp+'_epoch_'+str(epoch))

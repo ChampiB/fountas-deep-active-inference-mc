@@ -179,7 +179,7 @@ class ActiveInferenceModel:
             self.model_top.qpi_net.load_weights(folder_chp+'/checkpoint_qpi')
             self.model_mid.ps_net.load_weights(folder_chp+'/checkpoint_ps')
 
-    def save_all(self, folder_chp, stats, script_file="", optimizers={}):
+    def save_all(self, folder_chp, stats, script_file=""):
         self.save_weights(folder_chp)
         with open(folder_chp+'/stats.pkl','wb') as ff:
             pickle.dump(stats,ff)
