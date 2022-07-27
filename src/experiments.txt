@@ -3,3 +3,83 @@ sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega
 sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega False --efe False --vfe True --signature experiments_FalseFalseTrue
 sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega True --efe False --vfe False --signature experiments_TrueFalseFalse
 sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega True --efe True --vfe True --signature experiments_TrueTrueTrue
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse0.01_30_1.0_50_10_5/checkpoints"
+Submitted batch job 217425
+P(solved): 0.66125
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseTrueFalse0.01_30_1.0_50_10_5/checkpoints"
+Submitted batch job 217426
+P(solved): 0.665625
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseTrue0.01_30_1.0_50_10_5/checkpoints"
+Submitted batch job 217427
+P(solved): 0.6753125
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_TrueFalseFalse0.01_30_1.0_50_10_5/checkpoints"
+Submitted batch job 217428
+P(solved): 0.469375
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_TrueTrueTrue0.01_30_1.0_50_10_5/checkpoints"
+Submitted batch job 217429
+P(solved): 0.5765625
+
+
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega False --efe False --vfe False --signature experiments_FalseFalseFalse_v1_
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega False --efe False --vfe False --signature experiments_FalseFalseFalse_v2_
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega False --efe False --vfe False --signature experiments_FalseFalseFalse_v3_
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega False --efe False --vfe False --signature experiments_FalseFalseFalse_v4_
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu train.sh --omega False --efe False --vfe False --signature experiments_FalseFalseFalse_v5_
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v1_0.01_30_1.0_50_10_5/checkpoints"
+218113
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v2_0.01_30_1.0_50_10_5/checkpoints"
+218114
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v3_0.01_30_1.0_50_10_5/checkpoints"
+218115
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v4_0.01_30_1.0_50_10_5/checkpoints"
+218116
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v5_0.01_30_1.0_50_10_5/checkpoints"
+218117
+
+
+
+
+
+
+# With MCTS at test time
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v1_0.01_30_1.0_50_10_5/checkpoints"
+218121
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v2_0.01_30_1.0_50_10_5/checkpoints"
+218122
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v3_0.01_30_1.0_50_10_5/checkpoints"
+218123
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v4_0.01_30_1.0_50_10_5/checkpoints"
+218124
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse_v5_0.01_30_1.0_50_10_5/checkpoints"
+218125
+
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseFalse0.01_30_1.0_50_10_5/checkpoints"
+218126
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseTrueFalse0.01_30_1.0_50_10_5/checkpoints"
+218127
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_FalseFalseTrue0.01_30_1.0_50_10_5/checkpoints"
+218128
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_TrueFalseFalse0.01_30_1.0_50_10_5/checkpoints"
+218129
+
+sbatch -p gpu --mem=10G --gres-flags=disable-binding --gres=gpu test.sh -n "./figs_experiments_TrueTrueTrue0.01_30_1.0_50_10_5/checkpoints"
+218130
